@@ -1,5 +1,5 @@
 numpy
-scipy
+scipy==1.7.3
 matplotlib
 librosa==0.10.1
 pygame==2.5.2
