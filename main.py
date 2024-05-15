@@ -1,3 +1,4 @@
+import sys
 import torch
 import cv2
 import pyvirtualcam
@@ -33,6 +34,7 @@ from flask_restful import Resource, Api, reqparse
 app = Flask(__name__)
 api = Api(app)
 
+processes = []
 
 def convert_linear_to_srgb(image: torch.Tensor) -> torch.Tensor:
     rgb_image = torch_linear_to_srgb(image[0:3, :, :])
@@ -501,12 +503,19 @@ class FlaskAPI(Resource):
                     model_process_args['input_image_q'].put_nowait(input_image)
                 else:
                     return {"status": "Need img!! 0.0", "receive args": json_args}, 200
+            elif json_args['type'] == "stop_process":
+                stop_processes()
             else:
                 print('No type name {}!! 0.0'.format(json_args['type']))
         except Exception as ex:
             print(ex)
 
         return {'status': "success"}, 200  # 返回200 OK数据
+
+
+def stop_processes():
+    for p in processes:
+        p.terminate()
 
 
 if __name__ == '__main__':
@@ -527,6 +536,7 @@ if __name__ == '__main__':
     model_process = ModelClientProcess(input_image, device, model_process_args)
     model_process.daemon = True
     model_process.start()
+    processes.append(model_process)
 
     # 声明跨进程公共参数
     alive_args = {
@@ -540,10 +550,12 @@ if __name__ == '__main__':
     # 初始化模块
     alive = Alive(alive_args)
     alive.start()
+    processes.append(alive)
 
     # 初始化主进程
     aiv = EasyAIV(model_process_args, alive_args)
     aiv.start()
+    processes.append(aiv)
 
     api.add_resource(FlaskAPI, '/alive')
     app.run(port=args.port)  # 运行 Flask app
